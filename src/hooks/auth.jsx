@@ -1,5 +1,22 @@
 import { createContext, useContext, useState, useEffect } from "react";
-import { jwtDecode } from "jwt-decode";
+import { toast } from 'react-toastify';
+
+// Small helper to decode JWT payload without adding external deps.
+// It decodes the middle segment (base64url) and parses JSON. Returns {} on error.
+function decodeJwtPayload(token) {
+    try {
+        const parts = token.split('.');
+        if (!parts[1]) return {};
+        // base64url -> base64
+        const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+        const padded = base64.padEnd(base64.length + (4 - (base64.length % 4)) % 4, '=');
+    const hasBuffer = (typeof Buffer !== 'undefined');
+    const json = hasBuffer ? Buffer.from(padded, 'base64').toString('utf8') : decodeURIComponent(escape(window.atob(padded)));
+        return JSON.parse(json);
+    } catch (e) {
+        return {};
+    }
+}
 import { api } from "../services/api";
 
 export const AuthContext = createContext({});
@@ -9,7 +26,8 @@ function AuthProvider({ children }) {
     const [loading, setLoading] = useState(true);
 
     function isTokenExpired(token) {
-        const { exp } = jwtDecode(token);
+        const { exp } = decodeJwtPayload(token) || {};
+        if (!exp) return true; // if we cannot parse, treat as expired
         const expirationTime = exp * 1000;
         return Date.now() > expirationTime;
     };
@@ -30,11 +48,11 @@ function AuthProvider({ children }) {
             setData({ user, token });
         } catch(error) {
             if(error.response) {
-                alert(error.response.data.message);
+                toast.error(error.response.data.message || 'Erro ao entrar');
             } else if (error.message === "Token expirado") {
-                alert("Token expirado. Por favor, faça login novamente.");
+                toast.error("Token expirado. Por favor, faça login novamente.");
             } else {
-                alert("Não foi possível entrar.");
+                toast.error("Não foi possível entrar.");
             };
         };
     };
@@ -54,12 +72,12 @@ function AuthProvider({ children }) {
                 localStorage.setItem("@system:user", JSON.stringify(sessionUpdated));
                 setData({ user: sessionUpdated, token: data.token });
             };
-            alert("Perfil atualizado!");
+            toast.success("Perfil atualizado!");
         } catch(error) {
             if(error.response) {
-                alert(error.response.data.message);
+                toast.error(error.response.data.message || 'Erro ao atualizar perfil');
             } else {
-                alert("Não foi possível atualizar o perfil.");
+                toast.error("Não foi possível atualizar o perfil.");
             };
         };
     };

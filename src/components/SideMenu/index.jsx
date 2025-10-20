@@ -231,6 +231,16 @@ export function SideMenu({ menuIsOpen, onCloseMenu, onLinkClick }) {
                     </a>
                 }
 
+                {
+                    user.role === "admin" &&
+                    <a
+                        data-menu-active={activeLink === "/backup"}
+                        onClick={() => handleLinkClick("/backup")}
+                    >
+                        <FaCodeBranch />Backups
+                    </a>
+                }
+
                 <a
                     data-menu-active={activeLink === "/logout"}
                     onClick={handleSignOut}

@@ -2,6 +2,7 @@ import { useId } from "react";
 import { FiX, FiUpload } from "react-icons/fi";
 
 import { Container } from './styles';
+import { toast } from 'react-toastify';
 
 export function ArquiveItem({ isNew, value, fileUrl, onClick, onFileChange, disabled = false, ...rest }) {
     const uniqueId = useId();
@@ -15,7 +16,7 @@ export function ArquiveItem({ isNew, value, fileUrl, onClick, onFileChange, disa
     const handleDisabledClick = (e) => {
         if (disabled) {
             e.preventDefault();
-            alert("Você não pode realizar um novo upload enquanto não excluir o atual.");
+            toast.info('Você não pode realizar um novo upload enquanto não excluir o atual.');
         }
     };
 

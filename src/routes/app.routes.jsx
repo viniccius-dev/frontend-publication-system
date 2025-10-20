@@ -9,6 +9,7 @@ import { Details } from "../pages/Details";
 import { NewPublication } from "../pages/NewPublication";
 import { EditPublication } from "../pages/EditPublication";
 import { PublicationTypes } from "../pages/PublicationTypes";
+import { Backup } from "../pages/Backup";
 
 export function LoggRoutes() {
     const { user } = useAuth();
@@ -23,6 +24,7 @@ export function LoggRoutes() {
 
             {user.role === "admin" && <Route path="/domains" element={<Domains />} />}
             {user.role === "admin" && <Route path="/publication-types" element={<PublicationTypes />} />}
+            {user.role === "admin" && <Route path="/backup" element={<Backup />} />}
             
             <Route path="*" element={<Navigate to="/" />} />
         </Routes>
