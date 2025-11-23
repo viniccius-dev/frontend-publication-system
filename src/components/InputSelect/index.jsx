@@ -110,7 +110,7 @@ export function InputSelect({ title, group, options, onSelect, selected, objectV
             {/* Option List */}
             <div
                 className={`
-                    absolute w-full mt-1 z-10
+                    absolute w-full mt-1 z-20
                     rounded-xl bg-[#E5E5E5] text-[#1A1A1A]
                     overflow-y-auto transition-all duration-300 ease-in-out
                     shadow-lg
