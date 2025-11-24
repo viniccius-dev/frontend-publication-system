@@ -18,6 +18,7 @@ export function Backup() {
   const [selectedType, setSelectedType] = useState(null);
   const [selectedDomain, setSelectedDomain] = useState(null);
   const [selectedFrequency, setSelectedFrequency] = useState(null);
+  const [exportProgress, setExportProgress] = useState(null);
 
   const [uploadFiles, setUploadFiles] = useState([]);
   const [previewInfo, setPreviewInfo] = useState(null);
@@ -52,15 +53,30 @@ export function Backup() {
   const handleExport = useCallback(async () => {
     try {
       setExporting(true);
+      setExportProgress(0);
       toast.info('Iniciando exportação...');
 
-      const responseExport = await api.get(`/domains/export`, {
+      // Inicia exportação
+      const exportPromise = api.get(`/domains/export`, {
         params: {
           domain_id: selectedDomain?.id,
           type_of_publication_id: selectedType?.id,
         },
-        responseType: 'blob'
+        responseType: "blob",
       });
+
+      // Enquanto o backend está exportando, polling:
+      const interval = setInterval(async () => {
+        try {
+          const progressRes = await api.get('/domains/export-progress') ?? 0;
+          setExportProgress(progressRes.data.progress);
+        } catch {}
+      }, 500);
+
+      const responseExport = await exportPromise;
+
+      clearInterval(interval);
+      setExportProgress(100);
 
       const responseLogs = await api.get(`/domains/backup-logs`);
 
@@ -75,9 +91,12 @@ export function Backup() {
       toast.success('Exportação concluída com sucesso.');
     } catch (error) {
       console.error(error);
-      toast.error('Nenhum dado encontrado ou erro na exportação.');
+      toast.error('Erro na exportação.');
     } finally {
       setExporting(false);
+
+      // Resetar progress bar depois de uns segundos
+      setTimeout(() => setExportProgress(null), 2000);
     }
   }, [selectedDomain, selectedType]);
 
@@ -306,6 +325,23 @@ export function Backup() {
                     // disabled={!selectedDomain || exporting}
                   />
                 </Actions>
+
+                {exportProgress !== null && (
+                  <div style={{ marginTop: 12 }}>
+                    <div style={{ width: "100%", background: "#ddd", height: 10, borderRadius: 5 }}>
+                      <div
+                        style={{
+                          width: `${exportProgress}%`,
+                          height: "100%",
+                          background: "#2196f3",
+                          borderRadius: 5,
+                          transition: "0.3s"
+                        }}
+                      ></div>
+                    </div>
+                    <div style={{ fontSize: 12 }}>{exportProgress}%</div>
+                  </div>
+                )}
               </>
             )}
           </Section>
