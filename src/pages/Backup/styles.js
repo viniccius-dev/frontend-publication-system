@@ -8,6 +8,7 @@ export const Container = styled.div`
   gap: 20px;
   flex-direction: column;
   background: transparent;
+  overflow-y: auto;
 
   @media (min-width: ${DEVICE_BREAKPOINTS.LG}) {
     gap: 24px;

@@ -26,18 +26,30 @@ export function Backup() {
 
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [savingFrequency, setSavingFrequency] = useState(false);
   const [filtersLoading, setFiltersLoading] = useState(false);
 
   const fetchFilters = useCallback(async () => {
     setFiltersLoading(true);
     try {
-      const [typesRes, domainsRes] = await Promise.all([
+      const [typesRes, domainsRes, frequencyRes] = await Promise.all([
         api.get('/types-of-publication'),
         api.get('/domains'),
+        api.get('/domains/system-setting/backup_frequency')
       ]);
+
+      // Mapa de conversão EN/PT
+      const frequencyMap = {
+        "daily": "Diário",
+        "weekly": "Semanal",
+        "monthly": "Mensal",
+      };
+
+      const portugueseValue = frequencyMap[frequencyRes.data.value];
 
       setTypes(typesRes.data || []);
       setDomains(domainsRes.data || []);
+      setSelectedFrequency({id: frequencyRes.id, name: portugueseValue } || []);
     } catch (err) {
       console.error(err);
       toast.error('Erro ao carregar filtros.');
@@ -266,14 +278,44 @@ export function Backup() {
     }
   }, [uploadFiles, selectedDomain, selectedType]);
 
-  const [frequency, setFrequency] = useState(
-    () => localStorage.getItem('@backup:frequency') || 'daily'
-  );
+  const handleSaveFrequency = useCallback(async () => {
+    if (!selectedFrequency) {
+      toast.warn("Selecione uma frequência.");
+      return;
+    }
 
-  const handleSaveFrequency = useCallback(() => {
-    localStorage.setItem('@backup:frequency', frequency);
-    toast.success('Frequência de backup atualizada com sucesso!');
-  }, [frequency]);
+    try {
+      setSavingFrequency(true);
+
+      // Mapa de conversão PT/EN
+      const frequencyMap = {
+        "Diário": "daily",
+        "Semanal": "weekly",
+        "Mensal": "monthly",
+      };
+
+      const englishValue = frequencyMap[selectedFrequency.name];
+
+      if (!englishValue) {
+        toast.error("Frequência inválida.");
+        return;
+      }
+
+      const payload = {
+        key: "backup_frequency",
+        value: englishValue,
+      };
+
+      const updateFrequency = await api.put(`/domains/system-settings`, payload);
+
+      toast.success(updateFrequency.data.message || "Frequência salva com sucesso!");
+    } catch (error) {
+      console.error(error);
+      toast.error("Erro na configuração da frequência de backup.");
+    } finally {
+      setSavingFrequency(false);
+    }
+  }, [selectedFrequency]);
 
   const [logs, setLogs] = useState(() =>
     JSON.parse(localStorage.getItem('@backup:logs') || '[]')
@@ -290,14 +332,15 @@ export function Backup() {
 
   return (
     <Fixed title="Backups" route="/backup">
+    
+      {filtersLoading ? (
+        <LoadingSpinner loading={true} />
+      ) : (
       <Container>
         <Row>
           {/* EXPORTAR */}
           <Section title="Exportar Dados">
             <p>Selecione o que deseja exportar do sistema.</p>
-            {filtersLoading ? (
-              <LoadingSpinner loading={true} />
-            ) : (
               <>
                 <InputSelect
                   title="Selecione o tipo de publicação"
@@ -343,7 +386,6 @@ export function Backup() {
                   </div>
                 )}
               </>
-            )}
           </Section>
 
 
@@ -359,7 +401,7 @@ export function Backup() {
               selected={selectedFrequency}
             />
             <Actions>
-              <Button title="Salvar configuração" onClick={handleSaveFrequency} />
+              <Button title="Salvar configuração" onClick={handleSaveFrequency} loading={savingFrequency} />
             </Actions>
           </Section>
         </Row>
@@ -456,6 +498,7 @@ export function Backup() {
           </Section>
         </Row>
       </Container>
+      )}
     </Fixed>
   );
 }
