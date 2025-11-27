@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import JSZip from "jszip";
 
 import { Fixed } from '../../components/Fixed';
 import { Section } from '../../components/Section';
@@ -112,84 +113,68 @@ export function Backup() {
     }
   }, [selectedDomain, selectedType]);
 
-  const handleFilesChange = useCallback((files) => {
-    setUploadFiles(files);
-
-    
-    const info = files.map((f) => ({ name: f.file.name, size: f.file.size }));
-    setPreviewInfo(info);
-    (async () => {
-      try {
-        const fd = new FormData();
-        fd.append('backup', files[0].file);
-
-        // const res = await api.post('/backups/import?preview=true', fd, {
-        //   headers: { 'Content-Type': 'multipart/form-data' },
-        // });
-
-        const res = {
-  "message": "Preview gerado com sucesso",
-  "summary": {
-    "domains": [
-        {
-            "name": "Prefeitura de Xique Xique",
-            "publication_records": 1821,
-            "attachment_records": 2403
-        },
-        {
-            "name": "Câmara de João Pessoa",
-            "publication_records": 1164,
-            "attachment_records": 1152
-        }
-    ],
-    "types_of_publication": [
-        {
-            "name": "Leis Complementares",
-            "publication_records": 905,
-            "attachment_records": 1107
-        },
-        {
-            "name": "Requerimentos",
-            "publication_records": 592,
-            "attachment_records": 698
-        },
-        {
-            "name": "Portarias",
-            "publication_records": 1488,
-            "attachment_records": 1750
-        }
-    ],
-    "total_publications": 2985,
-    "total_attachments": 3555,
-    "users": 6
-  }
-}
-
-        if (res.data) {
-          if (res.data.preview) {
-            setPreviewInfo((prev) => ({ ...prev, serverPreview: res.data.preview }));
-          } else if (res.data.summary) {
-            const summary = res.data.summary;
-            const serverPreview = {
-              totalFiles:
-                summary.total_publications +
-                (summary.total_attachments || 0),
-              counts: {
-                total_publications: summary.total_publications,
-                total_attachments: summary.total_attachments,
-              },
-              details: summary,
-            };
-            setPreviewInfo((prev) => ({ ...prev, serverPreview }));
-          } else {
-            setPreviewInfo((prev) => ({ ...prev, serverPreview: res.data }));
-          }
-        }
-      } catch (err) {
-        console.error('preview error', err);
-        toast.error('Erro ao fazer preview no servidor.');
+  const handleFilesChange = useCallback(async (fileList) => {
+      if (!fileList || !Array.isArray(fileList) || fileList.length === 0) {
+          toast.error("Selecione um arquivo ZIP");
+          return;
       }
-    })();
+
+      const realFile = fileList[0].file;
+
+      if (!(realFile instanceof File)) {
+          toast.error("Erro: arquivo inválido.");
+          return;
+      }
+
+      let loadingToast;
+
+      try {
+        loadingToast = toast.loading("Processando arquivo ZIP...");
+
+        const zip = await JSZip.loadAsync(realFile);
+
+        const sqlFile = zip.file("database_export.sql");
+
+        if (!sqlFile) {
+            toast.update(loadingToast, {
+                render: "database_export.sql não encontrado.",
+                type: "error",
+                isLoading: false,
+                autoClose: 3000
+            });
+            return;
+        }
+
+        const sqlContent = await sqlFile.async("blob");
+
+        const formData = new FormData();
+        formData.append("file", sqlContent, "database_export.sql");
+
+        const response = await api.post(
+            "/domains/import/preview",
+            formData,
+            { headers: { "Content-Type": "multipart/form-data" } }
+        );
+
+        toast.update(loadingToast, {
+            render: "Preview gerado com sucesso!",
+            type: "success",
+            isLoading: false,
+            autoClose: 3000
+        });
+        
+        setPreviewInfo(response.data.summary);
+
+      } catch (error) {
+        console.error(error);
+        toast.update(loadingToast, {
+            render: "Erro ao processar importação.",
+            type: "error",
+            isLoading: false,
+            autoClose: 3000
+        });
+      }
+
   }, []);
 
   const handleConfirmImport = useCallback(async () => {
@@ -413,32 +398,46 @@ export function Backup() {
               Selecione um arquivo de backup (.zip) para importar.
             </p>
 
-            <Uploads onFilesChange={handleFilesChange} />
+            <Uploads onFilesChange={handleFilesChange} main />
 
             {previewInfo && (
               <Preview style={{ marginTop: 12 }}>
-                <ul>
-                  {previewInfo.map((p, i) => (
-                    <li key={i}>
-                      {p.name} — {(p.size / 1024).toFixed(1)} KB
-                    </li>
-                  ))}
-                </ul>
+                
+                <h3>Resumo da Importação</h3>
 
-                {previewInfo.serverPreview && (
-                  <div style={{ marginTop: 8 }}>
-                    <strong>Preview do servidor:</strong>
-                    <div>Total de arquivos no ZIP: {previewInfo.serverPreview.totalFiles}</div>
-                    <div>Contagens por tabela:</div>
-                    <ul>
-                      {Object.entries(previewInfo.serverPreview.counts).map(([table, count]) => (
-                        <li key={table}>
-                          {table}: {count}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+                {/* Total geral */}
+                <div style={{ marginBottom: 10 }}>
+                  <strong>Total de publicações:</strong> {previewInfo.total_publications}
+                </div>
+
+                <div style={{ marginBottom: 10 }}>
+                  <strong>Total de usuários:</strong> {previewInfo.users}
+                </div>
+
+                {/* Domínios */}
+                <div style={{ marginTop: 15 }}>
+                  <strong>Domínios:</strong>
+                  <ul>
+                    {previewInfo.domains.map(domain => (
+                      <li key={domain.id}>
+                        {domain.name} — {domain.publication_records} registros
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Tipos de publicação */}
+                <div style={{ marginTop: 15 }}>
+                  <strong>Tipos de Publicação:</strong>
+                  <ul>
+                    {previewInfo.types_of_publication.map(tp => (
+                      <li key={tp.id}>
+                        {tp.name} — {tp.publication_records} registros
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
               </Preview>
             )}
 
@@ -463,7 +462,6 @@ export function Backup() {
                 title="Confirmar Importação"
                 onClick={handleConfirmImport}
                 loading={loading}
-                style={{ maxWidth: 240, width: '100%' }}
               />
             </div>
           </Section>

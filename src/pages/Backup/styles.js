@@ -25,13 +25,19 @@ export const Row = styled.div`
 
   section {
     width: 100%;
+    min-height: 200px;
     position: relative;
+  }
+
+  @media (min-width: ${DEVICE_BREAKPOINTS.MD}) {
+    section {
+      min-height: 300px;
+    }
   }
 
   @media (min-width: ${DEVICE_BREAKPOINTS.LG}) {
     section {
       width: calc(50% - 10px);
-      min-height: 300px;
     }
 
     gap: 20px;

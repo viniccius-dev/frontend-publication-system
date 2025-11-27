@@ -39,7 +39,7 @@ export function Button({ title, loading = false, background = "default", icon: I
                     ${!loading && 'group-hover:scale-110'}
                 `} />
             )}
-            <span className="relative z-10 tracking-wide">
+            <span className="relative tracking-wide">
                 {loading ? 'Carregando...' : title}
             </span>
         </button>
